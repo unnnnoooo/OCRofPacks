@@ -3,13 +3,14 @@
 # 读取需要的库
 
 ############################################################
-
 # 图像处理库，包含部分机器学习的功能
 import cv2
 
 # 矩阵处理库，便于矩阵处理
 import numpy as np
 
+# 常数
+import CONSTANT as const
 # 定义几个卷积核大小
 kernel1 = np.ones((1, 1), np.uint8)
 kernel3 = np.ones((3, 3), np.uint8)
@@ -26,30 +27,24 @@ kernel9 = np.ones((9, 9), np.uint8)
 # 定义PreProcess，变量为一个灰度图像。
 
 
-def PreProcess(img, c=1):
+def PreProcess(img, blocksize, csize ,c=1):
     # 调用二值化函数
     # 读入原始图像，输出一个经过灰度，阈值处理的图像
-    cv2.imwrite("D:/resource/stack/origin.png", img)
-
-    img = BeBinary(img)
+    # cv2.imwrite("D:/resource/stack/origin.png", img)
+    img = BeBinary(img,blocksize,csize)
     backup = img
     # 从图片中找出处理区域
     # 把img读入，输出在img上划线的图
-    img, Angle, xx, yy, dx, dy = Roi(img)
-    rows, cols = backup.shape
-    # 这里的第一个参数为旋转中心，第二个为旋转角度，第三个为旋转后的缩放因子
-    # 可以通过设置旋转中心，缩放因子，以及窗口大小来防止旋转后超出边界的问题
-    M = cv2.getRotationMatrix2D((cols / 2, rows / 2), (Angle / np.pi) * 180, 1)
-    # 第三个参数是输出图像的尺寸中心
-    backup = cv2.warpAffine(backup, M, (cols,  rows))
+    rotated, Angle, xx, yy, dx, dy = Roi(img)
+    cv2.imwrite('D:/resource/stack/rotate.png',rotated)
     # 裁剪图像，留下目标区域
-    img = img[yy + 10:(yy + dy - 10), xx + 10:(xx + dx - 10)]
+    img = rotated[yy:(yy + dy), xx :(xx + dx )]
     cv2.imwrite("D:/resource/stack/backup.png", img)
 
     which = slice(img)
     r,l=img.shape
-    img = img[which[1]-10:which[1]+70, 0:l-1]     # img = img[which[1]-10:which[-1]+10,0:l-1]
-    cv2.imshow("final", img)
+    img = img[which[1]-10:which[-1]+10, :]     # img = img[which[1]-10:which[-1]+10,0:l-1]
+    # cv2.imshow("final", img)
     cv2.imwrite("D:/resource/stack/which.png", img)
     left, right = bread(img)
     adr1 = "D:/resource/stack/"
@@ -57,18 +52,25 @@ def PreProcess(img, c=1):
 
     for i in range(10):#left
         adr3 = str(i)
-        adr = adr1 + adr3 + adr2
+        adr = const.ADDRESS_0 + const.ADDRESS_1 + adr3 + const.ADDRESS_2
         #竖切，分离数字
-        pic = img[0:r,left[i]:right[i]]
-        r,l = pic.shape
+        pic = img[0:r, left[i]:right[i]]
+        r, _ = pic.shape
         a = bready(pic)
         #横切，去除白边
-        pic = pic[a[0]:a[1], 0:l-1]
+        if len(a) == 1:
+            if a[0]<(r/2):
+                pic = pic[a[0]:r,:]
+            if a[0]>(r/2):
+                pic = pic[0:a[0],:]
+        elif len(a) == 2:
+            pic = pic[a[0]:a[1], 0:l-1]
 
+        pic = cv2.resize(pic,(40,60))
         cv2.imwrite(adr, pic)
     # 调用查找轮廓函数
     # 直接输出轮廓
-    FindNum(backup, c)
+    # FindNum(backup, c)
 
 
 ############################################################
@@ -78,50 +80,50 @@ def PreProcess(img, c=1):
 ############################################################
 
 
-def FindNum(th, c):
-    # 读取白色1280x720的图片做背景用来绘制轮廓
-    white = cv2.imread("D:/PProject/white.png")
-    # 以Tree的形式读入，contours是轮廓点坐标，hierarchy是轮廓关系
-    image, contours, hierarchy = cv2.findContours(
-        th, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.imwrite("D:/resource/stack/ultraimage.png", image)
-    # 循环i，以hierarchy[0]的长度为上线，其实就是轮廓的总数
-    for i in range(len(hierarchy[0])):
-        # k等于第i个轮廓的hierarchy的第三项，即子关系
-        k = hierarchy[0][i][2]
-        # 如果第i个轮廓有子轮廓并且其子轮廓没有子轮廓
-        # 这个条件是因为数字的轮廓最多只有两层
-        # k轮廓是i轮廓的子轮廓
-        if (k != -1) & (hierarchy[0][k][2] == -1):
-            # 如果轮廓的长度小于400
-            # 这个条件是为了限制一些过长的干扰轮廓
-            if len(contours[i]) < 400:
-                # 如果k轮廓的长度大于40 CONDITION#1
-                # 这个条件也是为了限制一些过长干扰轮廓
-                if len(contours[k]) > 20:
-                    # 在white上绘制符合条件轮廓，颜色是黑色,大小是1个像素
-                    cv2.drawContours(white, contours[i], -1, (0, 0, 0), c)
-                    cv2.drawContours(white, contours[k], -1, (0, 0, 0), c)
-                    # 如果k轮廓还有同级轮廓
-                    if (hierarchy[0][k][0] != -1):
-                        # 并且该轮廓大于40.此条件与CONDITION#1相同
-                        if len(contours[hierarchy[0][k][0]] > 40):
-                            # 绘制k的同级轮廓
-                            cv2.drawContours(
-                                white, contours[hierarchy[0][k][0]],
-                                -1, (0, 0, 0), c)
-        # 如果i轮廓没有子轮廓
-        if k == -1:
-            # 如果该轮廓的长度>200且<280
-            if len(contours[i]) > 100 and len(contours[i]) < 200:
-                # 绘制该轮廓
-                cv2.drawContours(white, contours[i], -1, (0, 0, 0), c)
-
-    # 二值化处理以后把轮廓图存入栈文件夹备用（0对应0,1对应255）
-    white = cv2.cvtColor(white, cv2.COLOR_RGB2GRAY)
-    ret, white = cv2.threshold(white, 127, 255, cv2.THRESH_BINARY)
-    cv2.imwrite("D:/resource/stack/test.png", white)
-    return white
+# def FindNum(th, c):
+#     # 读取白色1280x720的图片做背景用来绘制轮廓
+#     white = cv2.imread("D:/PProject/white.png")
+#     # 以Tree的形式读入，contours是轮廓点坐标，hierarchy是轮廓关系
+#     image, contours, hierarchy = cv2.findContours(
+#         th, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+#     cv2.imwrite("D:/resource/stack/ultraimage.png", image)
+#     # 循环i，以hierarchy[0]的长度为上线，其实就是轮廓的总数
+#     for i in range(len(hierarchy[0])):
+#         # k等于第i个轮廓的hierarchy的第三项，即子关系
+#         k = hierarchy[0][i][2]
+#         # 如果第i个轮廓有子轮廓并且其子轮廓没有子轮廓
+#         # 这个条件是因为数字的轮廓最多只有两层
+#         # k轮廓是i轮廓的子轮廓
+#         if (k != -1) & (hierarchy[0][k][2] == -1):
+#             # 如果轮廓的长度小于400
+#             # 这个条件是为了限制一些过长的干扰轮廓
+#             if len(contours[i]) < 400:
+#                 # 如果k轮廓的长度大于40 CONDITION#1
+#                 # 这个条件也是为了限制一些过长干扰轮廓
+#                 if len(contours[k]) > 20:
+#                     # 在white上绘制符合条件轮廓，颜色是黑色,大小是1个像素
+#                     cv2.drawContours(white, contours[i], -1, (0, 0, 0), c)
+#                     cv2.drawContours(white, contours[k], -1, (0, 0, 0), c)
+#                     # 如果k轮廓还有同级轮廓
+#                     if (hierarchy[0][k][0] != -1):
+#                         # 并且该轮廓大于40.此条件与CONDITION#1相同
+#                         if len(contours[hierarchy[0][k][0]] > 40):
+#                             # 绘制k的同级轮廓
+#                             cv2.drawContours(
+#                                 white, contours[hierarchy[0][k][0]],
+#                                 -1, (0, 0, 0), c)
+#         # 如果i轮廓没有子轮廓
+#         if k == -1:
+#             # 如果该轮廓的长度>200且<280
+#             if len(contours[i]) > 100 and len(contours[i]) < 200:
+#                 # 绘制该轮廓
+#                 cv2.drawContours(white, contours[i], -1, (0, 0, 0), c)
+#
+#     # 二值化处理以后把轮廓图存入栈文件夹备用（0对应0,1对应255）
+#     white = cv2.cvtColor(white, cv2.COLOR_RGB2GRAY)
+#     ret, white = cv2.threshold(white, 127, 255, cv2.THRESH_BINARY)
+#     cv2.imwrite("D:/resource/stack/test.png", white)
+#     return white
 
 
 ############################################################
@@ -131,12 +133,12 @@ def FindNum(th, c):
 ############################################################
 
 
-def BeBinary(img):
+def BeBinary(img,blocksize,csize):
     # 进行自适应阈值处理，可以不考虑亮度情况
     # 用大的处理区域加大的平均值
     img = cv2.resize(img, (720, 1280))
     threshold = cv2.adaptiveThreshold(
-        img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 33, 20)
+        img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, blocksize, csize)
     cv2.imwrite("D:/resource/stack/threshold.png", threshold)
 
     # 用小的处理框加小的平均值(暂时不用)
@@ -175,13 +177,15 @@ def Roi(pic):
     # 备份pic
     picback = pic
 
+    rows, cols = pic.shape
+
     r, l = pic.shape
     # 用canny函数绘制边框
     edges = cv2.Canny(pic, 100, 20)
     # 显示边框
-    cv2.imshow("Contour detection", edges)
+    # cv2.imshow("Contour detection", edges)
     # 读取白图
-    white = cv2.imread("D:/PProject/white.png")
+    # white = cv2.imread("D:/PProject/white.png")
     # 用霍夫变换检测图像，返回参数方程的两个值
     #设定阈值为100 备用
     yuzhi = 150
@@ -195,6 +199,8 @@ def Roi(pic):
         elif long <= 10:
             yuzhi-=5
             lines = cv2.HoughLines(edges, 1, np.pi / 180, yuzhi)
+        else:
+            break
 
     # 因为霍夫变换会生成许多条直线，因此，需要过滤部分不需要的。
     # 这里采用的是最外围的线来构成四边形。规则可以替换，暂时如此。
@@ -230,7 +236,7 @@ def Roi(pic):
             if abs(rho) <= SmallA:
                 SmallA = rho
                 # thetaAs = theta
-            elif rho >= BigA:
+            if abs(rho) >= BigA:
                 BigA = rho
                 # thetaAb = theta
         # for rho,theta in lines[i]:
@@ -248,7 +254,7 @@ def Roi(pic):
             if abs(rho) <= SmallB:
                 SmallB = rho
                 # thetaBs = theta
-            elif rho >= BigB:
+            if abs(rho) >= BigB:
                 BigB = rho
                 # thetaBb = theta
     # 画出符合条件的线
@@ -289,8 +295,8 @@ def Roi(pic):
         y8 = int(y0 - 2000 * (a2))
         cv2.line(picback, (x7, y7), (x8, y8), (0, 0, 255), 10)
     # dx是向的剪切宽度，dy是B向剪切长度
-    dx = int(BigA - SmallA)
-    dy = int(BigB - SmallB)
+    dx = abs(int(BigA - SmallA))
+    dy = abs(int(BigB - SmallB))
     # 以下步骤计算左上角交点点，利用交点以及dx和dy可以求出需要分割的区域
 
     if (x2 - x1) == 0:
@@ -327,7 +333,7 @@ def Roi(pic):
         y = k1 * x * 1.0 + b1 * 1.0
     x = int(r / 2 - x)
     y = int(l / 2 - y)
-    print(x, y)
+    # print(x, y)
 
     if abs((AngleA + np.pi / 90) % np.pi / 2 - np.pi / 90) <= (np.pi / 4):
         a = np.sin(AngleA)
@@ -340,9 +346,13 @@ def Roi(pic):
     yy = -a * x + b * y
     xx = int(r / 2 - xx)
     yy = int(l / 2 - yy)
-    print(xx, yy)
+    # print(xx, yy)
     cv2.imwrite('D:/resource/stack/houghlines3.png', picback)
-    return pic, AngleA, xx, yy, dx, dy
+
+    M = cv2.getRotationMatrix2D((cols / 2, rows / 2), (AngleA / np.pi) * 180, 1)
+    # 第三个参数是输出图像的尺寸中心
+    picback = cv2.warpAffine(picback, M, (cols, rows))
+    return picback, AngleA, xx, yy, dx, dy
 
 ############################################################
 
@@ -353,7 +363,7 @@ def Roi(pic):
 def slice(img):
     # r,l是图像像素的行和列
     r, l = img.shape
-    which = [0]
+    which = []
     # 扫描每一行
     for i in range(r):
         # 再扫描每一行的每一个像素点
@@ -392,6 +402,11 @@ def slice(img):
         # 如果同色最大长度小于等于100，并且黑色像素数目大于等于90，那么在which list中记录当前的行数，然后进入下一行的分析
         if (lenghofthesamecolorold <= 100) and (numberoftheblackpixel >= 90):
             which.append(i)
+    for i in range(len(which)):
+        if abs(which[i]-which[i+1])>=10:
+            which = which[0:i]
+            break
+
     return which
 
 ############################################################
@@ -481,6 +496,7 @@ def bready(img):
         for j in range(l):
             # 如果该该行存在黑色像素，那么flag置1，跳出循环。
             if img[i][j] == 0:
+
                 flag = 1
                 break
             # 否则flag置0
