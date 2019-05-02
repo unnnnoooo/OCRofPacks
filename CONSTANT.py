@@ -11,3 +11,7 @@ ADDRESS_0 = 'D:/resource/stack'
 ADDRESS_1 = '/'
 # .png
 ADDRESS_2 = '.png'
+# 数字行中最大同色连续长度
+LOSO = 130
+# 黑像素数量
+NOBP = 70
