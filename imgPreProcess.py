@@ -28,46 +28,51 @@ kernel9 = np.ones((9, 9), np.uint8)
 
 
 def PreProcess(img, blocksize, csize ,c=1):
-    # 调用二值化函数
-    # 读入原始图像，输出一个经过灰度，阈值处理的图像
-    # cv2.imwrite("D:/resource/stack/origin.png", img)
-    img = BeBinary(img,blocksize,csize)
-    backup = img
-    # 从图片中找出处理区域
-    # 把img读入，输出在img上划线的图
-    rotated, Angle, xx, yy, dx, dy = Roi(img)
-    cv2.imwrite('D:/resource/stack/rotate.png',rotated)
-    # 裁剪图像，留下目标区域
-    img = rotated[yy:(yy + dy), xx :(xx + dx )]
-    cv2.imwrite("D:/resource/stack/backup.png", img)
+    try:
 
-    which = slice(img)
-    r,l=img.shape
-    img = img[which[1]-10:which[-1]+10, :]     # img = img[which[1]-10:which[-1]+10,0:l-1]
-    # cv2.imshow("final", img)
-    cv2.imwrite("D:/resource/stack/which.png", img)
-    left, right = bread(img)
-    adr1 = "D:/resource/stack/"
-    adr2 = ".png"
+        # 调用二值化函数
+        # 读入原始图像，输出一个经过灰度，阈值处理的图像
+        # cv2.imwrite("D:/resource/stack/origin.png", img)
+        img = BeBinary(img,blocksize,csize)
+        backup = img
+        # 从图片中找出处理区域
+        # 把img读入，输出在img上划线的图
+        rotated, Angle, xx, yy, dx, dy = Roi(img)
+        cv2.imwrite('D:/resource/stack/rotate.png',rotated)
+        # 裁剪图像，留下目标区域
+        img = rotated[yy + 10:(yy + dy - 10), xx + 40:(xx + dx - 40)]
+        cv2.imwrite("D:/resource/stack/backup.png", img)
 
-    for i in range(10):#left
-        adr3 = str(i)
-        adr = const.ADDRESS_0 + const.ADDRESS_1 + adr3 + const.ADDRESS_2
-        #竖切，分离数字
-        pic = img[0:r, left[i]:right[i]]
-        r, _ = pic.shape
-        a = bready(pic)
-        #横切，去除白边
-        if len(a) == 1:
-            if a[0]<(r/2):
-                pic = pic[a[0]:r,:]
-            if a[0]>(r/2):
-                pic = pic[0:a[0],:]
-        elif len(a) == 2:
-            pic = pic[a[0]:a[1], 0:l-1]
+        which = slice(img)
+        r,l=img.shape
+        img = img[which[0]-5:which[-1]+5, :]     # img = img[which[1]-10:which[-1]+10,0:l-1]
+        # cv2.imshow("final", img)
+        cv2.imwrite("D:/resource/stack/which.png", img)
+        left, right = bread(img)
+        adr1 = "D:/resource/stack/"
+        adr2 = ".png"
 
-        pic = cv2.resize(pic,(40,60))
-        cv2.imwrite(adr, pic)
+        for i in range(10):#left
+            adr3 = str(i)
+            adr = const.ADDRESS_0 + const.ADDRESS_1 + adr3 + const.ADDRESS_2
+            #竖切，分离数字
+            pic = img[0:r, left[i]:right[i]]
+            r, _ = pic.shape
+            a = bready(pic)
+            #横切，去除白边
+            if len(a) == 1:
+                if a[0]<(r/2):
+                    pic = pic[a[0]:r,:]
+                if a[0]>(r/2):
+                    pic = pic[0:a[0],:]
+            elif len(a) == 2:
+                pic = pic[a[0]:a[1], 0:l-1]
+
+            pic = cv2.resize(pic,(40,60))
+            cv2.imwrite(adr, pic)
+        return True
+    except Exception as e:
+        return False
     # 调用查找轮廓函数
     # 直接输出轮廓
     # FindNum(backup, c)
@@ -136,11 +141,11 @@ def PreProcess(img, blocksize, csize ,c=1):
 def BeBinary(img,blocksize,csize):
     # 进行自适应阈值处理，可以不考虑亮度情况
     # 用大的处理区域加大的平均值
-    img = cv2.resize(img, (720, 1280))
+    # img = cv2.resize(img, (720, 1280))
     threshold = cv2.adaptiveThreshold(
         img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, blocksize, csize)
     cv2.imwrite("D:/resource/stack/threshold.png", threshold)
-
+    cv2.imshow('pic', threshold)
     # 用小的处理框加小的平均值(暂时不用)
     # thresholdlow = cv2.adaptiveThreshold(
     #     img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 7)
@@ -189,11 +194,12 @@ def Roi(pic):
     # 用霍夫变换检测图像，返回参数方程的两个值
     #设定阈值为100 备用
     yuzhi = 150
+    # e3 = cv2.getTickCount()
     lines = cv2.HoughLines(edges, 1, np.pi / 180, yuzhi)
 
     for i in range(1000):
         long = len(lines)
-        if long >= 15:
+        if long >= 20:
             yuzhi+=5
             lines = cv2.HoughLines(edges, 1, np.pi / 180, yuzhi)#思考一种斜率恒定的渐变方式
         elif long <= 10:
@@ -201,7 +207,13 @@ def Roi(pic):
             lines = cv2.HoughLines(edges, 1, np.pi / 180, yuzhi)
         else:
             break
-
+    # 将所有rho化为正数
+    # e4 = cv2.getTickCount()
+    for i in range(len(lines)):
+        rho,theta = lines[i][0]
+        if rho < 0:
+            lines[i][0][0] = -rho
+            lines[i][0][1] = theta - np.pi
     # 因为霍夫变换会生成许多条直线，因此，需要过滤部分不需要的。
     # 这里采用的是最外围的线来构成四边形。规则可以替换，暂时如此。
     # SmallA是A方向的距离原点最近的直线，SmallB是B方向距离原点最近的直线。
@@ -217,7 +229,9 @@ def Roi(pic):
             # flag = i
             AngleA = theta
     # AngleA = AngleA % (np.pi / 2)
-    # if AngleA > 1:  #遗留问题：怎样处理这个pi #solved
+    while (AngleA > (np.pi/4)):
+        AngleA -= (np.pi/2)
+        #遗留问题：怎样处理这个pi #solved
 
     #     AngleB = AngleA - (np.pi / 2)
     # else:
@@ -233,10 +247,10 @@ def Roi(pic):
                 abs(AngleA - (theta - 2 * np.pi)) <= np.pi / 6)):
 
             # 以下6行目的选出A方向最近和最远的参数方程的参数
-            if abs(rho) <= SmallA:
+            if rho <= SmallA:
                 SmallA = rho
                 # thetaAs = theta
-            if abs(rho) >= BigA:
+            if rho >= BigA:
                 BigA = rho
                 # thetaAb = theta
         # for rho,theta in lines[i]:
@@ -251,10 +265,10 @@ def Roi(pic):
                 abs(AngleB - (theta - 2 * np.pi)) <= np.pi / 6)):
 
             # 以下6行目的选出B方向最近和最远的参数方程的参数
-            if abs(rho) <= SmallB:
+            if rho <= SmallB:
                 SmallB = rho
                 # thetaBs = theta
-            if abs(rho) >= BigB:
+            if rho >= BigB:
                 BigB = rho
                 # thetaBb = theta
     # 画出符合条件的线
@@ -298,7 +312,7 @@ def Roi(pic):
     dx = abs(int(BigA - SmallA))
     dy = abs(int(BigB - SmallB))
     # 以下步骤计算左上角交点点，利用交点以及dx和dy可以求出需要分割的区域
-
+    cv2.imwrite('D:/hf.png',picback)
     if (x2 - x1) == 0:
         k1 = None
         b1 = 0
@@ -331,27 +345,31 @@ def Roi(pic):
         # 如果只有k2不存在，因为上面已经求了x，这里只要求y
     elif k2 == None:
         y = k1 * x * 1.0 + b1 * 1.0
-    x = int(r / 2 - x)
-    y = int(l / 2 - y)
+    x = - int(l / 2 - x)
+    y = int(r / 2 - y)
     # print(x, y)
 
-    if abs((AngleA + np.pi / 90) % np.pi / 2 - np.pi / 90) <= (np.pi / 4):
-        a = np.sin(AngleA)
-        b = np.cos(AngleA)
-    else:
-        a = np.sin(AngleB)
-        b = np.cos(AngleB)
+    #if abs((AngleA + np.pi / 90) % np.pi / 2 - np.pi / 90) <= (np.pi / 4):
+    a = np.sin(AngleA)
+    b = np.cos(AngleA)
+
+    #else:
+        #a = np.sin(AngleB)
+        #b = np.cos(AngleB)
+
     # 矩阵变换
-    xx = b * x + a * y
-    yy = -a * x + b * y
-    xx = int(r / 2 - xx)
-    yy = int(l / 2 - yy)
+    xx = b * x - a * y
+    yy = a * x + b * y
+    xx = - int(l / 2 - xx)
+    yy = int(r / 2 - yy)
     # print(xx, yy)
     cv2.imwrite('D:/resource/stack/houghlines3.png', picback)
 
     M = cv2.getRotationMatrix2D((cols / 2, rows / 2), (AngleA / np.pi) * 180, 1)
     # 第三个参数是输出图像的尺寸中心
     picback = cv2.warpAffine(picback, M, (cols, rows))
+    # t = (e4 - e3) / cv2.getTickFrequency()
+    # print('hough :',t)
     return picback, AngleA, xx, yy, dx, dy
 
 ############################################################
@@ -400,9 +418,9 @@ def slice(img):
 
         # 扫描完这一行以后，对同色长度，以及黑色点数目进行讨论。
         # 如果同色最大长度小于等于100，并且黑色像素数目大于等于90，那么在which list中记录当前的行数，然后进入下一行的分析
-        if (lenghofthesamecolorold <= 100) and (numberoftheblackpixel >= 90):
+        if (lenghofthesamecolorold <= 130) and (numberoftheblackpixel >= 70):
             which.append(i)
-    for i in range(len(which)):
+    for i in range(len(which)-1):
         if abs(which[i]-which[i+1])>=10:
             which = which[0:i]
             break

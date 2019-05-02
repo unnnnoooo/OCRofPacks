@@ -86,4 +86,6 @@ def ocr():
         f3 += 1
 
     _, result1, _, _ = knn.findNearest(TARGET, k=5)
-    print(result1)
+
+    # print(result1)
+    return result1
