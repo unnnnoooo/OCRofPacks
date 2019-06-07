@@ -7,9 +7,6 @@
 # 图像处理库，包含部分机器学习的功能
 import cv2
 
-# 图像处理库，备用其中部分功能
-import skimage.io as io
-
 # 矩阵处理库，便于矩阵处理
 import numpy as np
 
@@ -39,10 +36,10 @@ cap.set(4, const.WIDTH)
 # 调节自适应阈值部分
 def nothing(x):
     pass
-img=np.zeros((200,200,3),np.uint8)
-cv2.namedWindow('image')
-cv2.createTrackbar('BLOCKSIZE','image',15,255,nothing)
-cv2.createTrackbar('C','image',30,255,nothing)
+# img=np.zeros((200,200,3),np.uint8)
+# cv2.namedWindow('image')
+# cv2.createTrackbar('BLOCKSIZE','image',15,255,nothing)
+# cv2.createTrackbar('C','image',30,255,nothing)
 
 
 # 读取例子，以此图为例
@@ -62,6 +59,14 @@ frame0 = wx.Frame(None, title="识别结果", pos=(1000, 200), size=(500, 400))
 content_text = wx.TextCtrl(frame0, pos=(5, 39), size=(475, 300), style=wx.TE_MULTILINE)
 content_text.SetValue('等待检测')
 frame0.Show()
+org = (40, 80)
+fontFace = cv2.FONT_HERSHEY_COMPLEX
+fontScale = 1
+fontcolor = (255, 255, 255) # BGR
+thickness = 5
+lineType = 4
+bottomLeftOrigin = 1
+
 #print(resultlast)
 while(1):
     ret = False
@@ -76,9 +81,11 @@ while(1):
 
         img = cv2.imread(const.CAMERA_PICTURE_ADDRESS, 0)
 
-
+        img = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
 
         img = np.rot90(img)
+        img = img[0:900,: ]
+        # cv2.imshow("origin", img)
         # cv2.imshow("origin",img)
         # 参数传入函数
         BLCSZ = 2 * cv2.getTrackbarPos('BLOCKSIZE', 'image') + 3
@@ -89,7 +96,9 @@ while(1):
 
             #img = cv2.imread('D:/PProject/pic.png', 0)
             # e1 = cv2.getTickCount()
-            ret = iPP.PreProcess(img,BLCSZ,Csize,1)
+            ret,bkp = iPP.PreProcess(img,33,20,1)
+            cv2.imshow("origin", bkp)
+            # wxbmp = wx.BitmapFromBuffer(720, 1280, bkp)
             # e2 = cv2.getTickCount()
             # t = (e2 - e1) / cv2.getTickFrequency()
             # print(t)
@@ -100,6 +109,7 @@ while(1):
             resultnow += str(int(result[1][0]))
             resultnow += str(int(result[2][0]))
             if (resultnow == resultlast):
+                cv2.putText(bkp, resultnow, org, fontFace, fontScale, fontcolor, thickness, lineType)
                 content_text.SetValue(resultnow)
                 frame0.Show()
 

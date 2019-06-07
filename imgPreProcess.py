@@ -67,9 +67,10 @@ def PreProcess(img, blocksize, csize ,c=1):
 
             pic = cv2.resize(pic, (40, 60))
             cv2.imwrite(adr,pic)
-        return True
-    except Exception as e:
-        return False
+        return True, backup
+    except:
+
+        return False,backup
 
 ############################################################
 
@@ -77,21 +78,20 @@ def PreProcess(img, blocksize, csize ,c=1):
 
 ############################################################
 
-
 def BeBinary(img, blocksize, csize):
     # 进行自适应阈值处理，可以不考虑亮度情况
     # 用大的处理区域加大的平均值
     # img = cv2.resize(img, (720, 1280))
     threshold = cv2.adaptiveThreshold(
         img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, blocksize, csize)
-    cv2.imshow('pic', threshold)
+    # cv2.imshow('pic', threshold)
     # 进行开运算，把部分过细的地方消除，并让主题部分不发生太大变化(开运算指的是先腐蚀再膨胀)
     threshold = cv2.morphologyEx(threshold, cv2.MORPH_OPEN, kernel5)
     threshold = cv2.morphologyEx(threshold, cv2.MORPH_CLOSE, kernel3)
     # 进行4次中值滤波,目的是清除个别离散噪点
     for a in range(1):
         blured = cv2.medianBlur(threshold, 5)
-
+    # cv2.imshow('1',blured)
     # 清除上部用过的threshold变量，减少内存使用。
     del (threshold)
 
